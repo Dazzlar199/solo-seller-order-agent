@@ -1,0 +1,21 @@
+[project]
+name = "solo-seller-order-agent"
+version = "0.1.0"
+description = "Chat-to-checkout order agent for one-person shops. AI drafts, a human approves money movement."
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "httpx>=0.27",
+  "openai>=1.40",
+  "python-dotenv>=1.0",
+  "pydantic>=2.8",
+  "requests>=2.31",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "playwright>=1.45"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

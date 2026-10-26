@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Solo Seller Order Agent</title>
+<style>
+:root{--bg:#f4f1ec;--panel:#fff;--ink:#1f2328;--mute:#6b7280;--line:#e5e1d8;--accent:#1d4d4f;--accent-2:#2f7a7c;
+--ok:#1f7a4d;--warn:#a85d00;--bad:#b3261e;--chip:#eef3f3}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+header{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;background:var(--accent);color:#fff}
+header h1{font-size:17px;margin:0;font-weight:650;letter-spacing:.2px}
+header .sub{font-size:12px;opacity:.8;margin-top:2px}
+.badges{display:flex;gap:8px;flex-wrap:wrap}
+.badge{font-size:11.5px;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25)}
+.badge.mock{background:#f3d9a4;color:#5c3b00;border-color:#e7c277}
+main{display:grid;grid-template-columns:minmax(320px,1fr) minmax(320px,1fr) minmax(320px,1fr);gap:16px;padding:16px 24px;height:calc(100vh - 66px)}
+.col{background:var(--panel);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.col h2{margin:0;padding:12px 16px;font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--mute);border-bottom:1px solid var(--line);display:flex;justify-content:space-between}
+.col h2 b{color:var(--ink);font-weight:600;text-transform:none;letter-spacing:0}
+.scroll{overflow:auto;padding:14px 16px;flex:1}
+.msg{max-width:88%;padding:9px 12px;border-radius:12px;margin:0 0 10px;white-space:pre-wrap;word-break:break-word}
+.msg.me{background:var(--accent);color:#fff;margin-left:auto;border-bottom-right-radius:3px}
+.msg.bot{background:#f1efe9;border-bottom-left-radius:3px}
+.msg a{color:var(--accent-2);font-weight:600}
+.msg.me a{color:#fff}
+.chips{display:flex;gap:6px;flex-wrap:wrap;padding:0 16px 8px}
+.chip{border:1px solid var(--line);background:var(--chip);color:var(--accent);border-radius:99px;padding:5px 11px;font-size:12px;cursor:pointer}
+.chip:hover{background:#e0ebeb}
+form.send{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--line)}
+form.send input{flex:1;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font:inherit}
+button{font:inherit;cursor:pointer}
+.btn{padding:9px 14px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:#fff;font-weight:600}
+.btn.ghost{background:#fff;color:var(--accent)}
+.btn.danger{background:#fff;color:var(--bad);border-color:#e3b5b1}
+.btn:disabled{opacity:.5;cursor:default}
+.card{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:12px;background:#fff}
+.card .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.oid{font-weight:650;font-family:ui-monospace,Menlo,monospace}
+.pill{font-size:11px;font-weight:650;padding:3px 9px;border-radius:99px;letter-spacing:.3px}
+.pill.AWAITING_PAYMENT,.pill.PENDING{background:#fdf0d8;color:var(--warn)}
+.pill.PAID,.pill.APPROVED{background:#dcf2e5;color:var(--ok)}
+.pill.REFUNDED,.pill.PARTIALLY_REFUNDED{background:#e2e8f7;color:#2c4a9a}
+.pill.CANCELLED,.pill.REJECTED{background:#f1e0df;color:var(--bad)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+td{padding:3px 0}td.r{text-align:right;font-variant-numeric:tabular-nums}
+.total td{border-top:1px solid var(--line);padding-top:6px;font-weight:650}
+.meta{color:var(--mute);font-size:12px;margin-top:6px;word-break:break-all}
+.row{display:flex;gap:8px;margin-top:10px}
+.empty{color:var(--mute);text-align:center;margin-top:40px;padding:0 16px}
+.principle{margin:0;padding:10px 16px;font-size:12px;background:#f7f4ee;border-bottom:1px solid var(--line);color:#5a5340}
+.audit{border-top:1px solid var(--line);padding:10px 16px;max-height:130px;overflow:auto;font-size:11.5px;color:var(--mute);font-family:ui-monospace,Menlo,monospace}
+.audit div{padding:1px 0}
+@media(max-width:1000px){main{grid-template-columns:1fr;height:auto}.col{min-height:420px}}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>Solo Seller Order Agent</h1><div class="sub">AI drafts. A human approves money movement.</div></div>
+  <div class="badges"><span class="badge" id="b-paypal">PayPal: ...</span><span class="badge" id="b-agent">Agent: ...</span></div>
+</header>
+<main>
+  <section class="col" aria-label="Customer chat">
+    <h2><span>Customer chat</span><b>Wild Otter Soap &amp; Candle Co.</b></h2>
+    <div class="scroll" id="chat"></div>
+    <div class="chips" id="chips"></div>
+    <form class="send" id="form"><input id="input" autocomplete="off" placeholder="Describe what you want to order..."><button class="btn" id="sendbtn">Send</button></form>
+  </section>
+  <section class="col" aria-label="Orders">
+    <h2><span>Orders and payment</span><b id="ocount"></b></h2>
+    <div class="scroll" id="orders"></div>
+    <div class="audit" id="audit"></div>
+  </section>
+  <section class="col" aria-label="Seller approvals">
+    <h2><span>Seller approval queue</span><b id="acount"></b></h2>
+    <p class="principle">Refunds and cancellations requested by the agent wait here. Only your click moves money.</p>
+    <div class="scroll" id="approvals"></div>
+  </section>
+</main>
+<script>
+const sid = (() => { try { let s = localStorage.getItem('sid'); if (!s) { s = 's' + Math.random().toString(36).slice(2, 10); localStorage.setItem('sid', s); } return s; } catch (e) { return 's' + Date.now(); } })();
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const linkify = s => esc(s).replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+const money = n => '$' + Number(n).toFixed(2);
+const label = s => s.replace(/_/g, ' ');
+function say(text, who) { const d = document.createElement('div'); d.className = 'msg ' + who; d.innerHTML = linkify(text); $('chat').appendChild(d); $('chat').scrollTop = 1e9; }
+
+async function cfg() {
+  const c = await (await fetch('/api/config')).json();
+  const p = $('b-paypal'); p.textContent = 'PayPal: ' + c.paypal; if (c.mock) p.classList.add('mock');
+  $('b-agent').textContent = 'Agent: ' + c.agent;
+}
+async function send(text) {
+  if (!text.trim()) return;
+  say(text, 'me'); $('input').value = ''; $('sendbtn').disabled = true;
+  try {
+    const r = await fetch('/api/chat', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({session_id: sid, message: text})});
+    const j = await r.json(); say(j.reply || j.detail || 'Error', 'bot');
+  } catch (e) { say('Network error, please retry.', 'bot'); }
+  $('sendbtn').disabled = false; refresh();
+}
+$('form').onsubmit = e => { e.preventDefault(); send($('input').value); };
+const SUGGEST = ['What do you sell?', '2 lavender soaps and a cedar candle', 'ship to Jane Kim, 12 Oak St, Austin, TX 78701'];
+$('chips').innerHTML = SUGGEST.map(s => `<button class="chip" type="button">${esc(s)}</button>`).join('');
+$('chips').querySelectorAll('.chip').forEach(b => b.onclick = () => send(b.textContent));
+
+function orderCard(o) {
+  const rows = o.items.map(i => `<tr><td>${i.quantity} x ${esc(i.name)}</td><td class="r">${money(i.unit_price * i.quantity)}</td></tr>`).join('');
+  const sh = o.shipping ? `${esc(o.shipping.name || '')}, ${esc(o.shipping.line1 || '')}, ${esc(o.shipping.city || '')} ${esc(o.shipping.state || '')} ${esc(o.shipping.postal_code || '')}` : '';
+  const pay = o.status === 'AWAITING_PAYMENT' && o.approve_url ? `<div class="row"><a class="btn" style="text-decoration:none" href="${esc(o.approve_url)}" target="_blank" rel="noopener">Pay with PayPal</a></div>` : '';
+  const refunded = o.refunded ? `<tr><td>Refunded</td><td class="r">-${money(o.refunded)}</td></tr>` : '';
+  return `<div class="card"><div class="top"><span class="oid">${o.id}</span><span class="pill ${o.status}">${label(o.status)}</span></div>
+  <table>${rows}${refunded}<tr class="total"><td>Total (USD)</td><td class="r">${money(o.total)}</td></tr></table>
+  <div class="meta">Ship to: ${sh}</div><div class="meta">PayPal order: ${esc(o.paypal_order_id)}${o.capture_id ? ' / capture ' + esc(o.capture_id) : ''}</div>${pay}</div>`;
+}
+function approvalCard(a) {
+  const btns = a.status === 'PENDING' ? `<div class="row"><button class="btn" data-a="approve" data-id="${a.id}">Approve ${a.kind.toLowerCase()}</button><button class="btn danger" data-a="reject" data-id="${a.id}">Decline</button></div>` : '';
+  return `<div class="card"><div class="top"><span class="oid">${a.id}</span><span class="pill ${a.status}">${a.status}</span></div>
+  <table><tr><td>${a.kind === 'REFUND' ? 'Refund' : 'Cancel order'} ${a.order_id}</td><td class="r">${money(a.amount)}</td></tr></table>
+  <div class="meta">Reason: ${esc(a.reason)}</div>${a.result ? `<div class="meta">${esc(a.result)}</div>` : ''}${btns}</div>`;
+}
+async function refresh() {
+  const s = await (await fetch('/api/state?session_id=' + sid)).json();
+  $('orders').innerHTML = s.orders.length ? s.orders.map(orderCard).join('') : '<div class="empty">No orders yet. Place one in the chat.</div>';
+  $('ocount').textContent = s.orders.length + (s.orders.length === 1 ? ' order' : ' orders');
+  const pend = s.approvals.filter(a => a.status === 'PENDING').length;
+  $('approvals').innerHTML = s.approvals.length ? s.approvals.map(approvalCard).join('') : '<div class="empty">Nothing waiting for approval.</div>';
+  $('acount').textContent = pend + ' pending';
+  $('audit').innerHTML = s.audit.map(a => `<div>${new Date(a.t * 1000).toLocaleTimeString()} ${esc(a.actor)}: ${esc(a.action)} ${esc(a.detail)}</div>`).join('');
+}
+$('approvals').onclick = async e => {
+  const b = e.target.closest('button[data-a]'); if (!b) return;
+  b.disabled = true;
+  const r = await fetch(`/api/approvals/${b.dataset.id}/${b.dataset.a}`, {method: 'POST'});
+  if (!r.ok) alert((await r.json()).detail);
+  refresh();
+};
+const q = new URLSearchParams(location.search);
+cfg(); refresh(); setInterval(refresh, 2500);
+say('Hi! Tell me what you would like to order. I can also check an order or request a refund for you.', 'bot');
+if (q.get('paid')) say('Welcome back from PayPal. Checking payment for ' + q.get('paid') + '...', 'bot');
+</script>
+</body>
+</html>

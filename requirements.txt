@@ -1,0 +1,9 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+httpx>=0.27
+openai>=1.40
+python-dotenv>=1.0
+pydantic>=2.8
+requests>=2.31
+# PayPal's official toolkit. Install with --no-deps (its pinned crewai/langchain extras are not needed):
+#   pip install --no-deps paypal-agent-toolkit

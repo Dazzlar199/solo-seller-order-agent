@@ -1,0 +1,60 @@
+[
+  {
+    "sku": "SOAP-LAV",
+    "name": "Lavender Oat Soap",
+    "description": "Cold-process bar, 110 g",
+    "price": 8.5,
+    "aliases": [
+      "lavender"
+    ]
+  },
+  {
+    "sku": "SOAP-CIT",
+    "name": "Citrus Peel Soap",
+    "description": "Cold-process bar, 110 g",
+    "price": 8.0,
+    "aliases": [
+      "citrus"
+    ]
+  },
+  {
+    "sku": "CNDL-SOY",
+    "name": "Soy Candle - Cedar",
+    "description": "Hand-poured, 180 g, 40 h burn",
+    "price": 18.0,
+    "aliases": [
+      "cedar",
+      "soy candle"
+    ]
+  },
+  {
+    "sku": "CNDL-MINI",
+    "name": "Mini Candle Trio",
+    "description": "Three 50 g travel candles",
+    "price": 14.5,
+    "aliases": [
+      "trio",
+      "mini candle",
+      "travel candle"
+    ]
+  },
+  {
+    "sku": "BALM-LIP",
+    "name": "Beeswax Lip Balm",
+    "description": "Unscented, 10 g",
+    "price": 4.5,
+    "aliases": [
+      "lip balm",
+      "balm"
+    ]
+  },
+  {
+    "sku": "GIFT-SET",
+    "name": "Gift Box (soap + candle)",
+    "description": "Boxed set, ready to ship",
+    "price": 24.0,
+    "aliases": [
+      "gift"
+    ]
+  }
+]
