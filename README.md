@@ -17,6 +17,14 @@ A solo seller (soap maker, candle shop, print-on-demand artist) takes orders ove
 4. The agent checks payment status on request; paid orders are captured automatically after the buyer approves.
 5. Refund and cancellation requests go to a **seller approval queue**. Nothing executes until the seller clicks Approve.
 
+## Real sandbox run
+
+Everything below ran against the real PayPal Sandbox (not mock mode) with a sandbox buyer account: chat order, PayPal Checkout approval, capture, refund request, seller approval, refund COMPLETED. The agent in this run was the rule-based fallback (no LLM key set).
+
+![Refund approved by the seller, order REFUNDED](docs/e2e/6_refund_approved.png)
+
+More screenshots: [order created](docs/e2e/1_order_created.png), [paid](docs/e2e/4_back_paid.png), [refund requested](docs/e2e/5_refund_requested.png). Demo video (under 3 minutes): `docs/demo/solo_seller_order_agent_demo.mp4`, recorded by `scripts/record_demo.py`. Devpost text: [docs/devpost_submission.md](docs/devpost_submission.md).
+
 ## Architecture
 
 ```mermaid
