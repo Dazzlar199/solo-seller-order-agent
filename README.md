@@ -25,7 +25,7 @@ Everything below ran against the real PayPal Sandbox (not mock mode) with a sand
 
 The run is reproducible with `scripts/e2e_sandbox.py` (needs the app running and a sandbox buyer account in `.env`).
 
-More screenshots: [order created](docs/e2e/1_order_created.png), [paid](docs/e2e/4_back_paid.png), [refund requested](docs/e2e/5_refund_requested.png). Demo video (under 3 minutes, real sandbox and real LLM, sandbox credentials covered): `docs/demo/solo_seller_order_agent_demo.mp4`, recorded by `scripts/record_demo.py`. Devpost text: [docs/devpost_submission.md](docs/devpost_submission.md).
+More screenshots: [order created](docs/e2e/1_order_created.png), [paid](docs/e2e/4_back_paid.png), [refund requested](docs/e2e/5_refund_requested.png). Demo video (under 3 minutes, real sandbox and real LLM, sandbox credentials covered): `docs/demo/solo_seller_order_agent_demo.mp4`, recorded by `scripts/record_demo.py` and finished by `scripts/postprocess_demo.py`. Devpost text: [docs/devpost_submission.md](docs/devpost_submission.md).
 
 ## Architecture
 
@@ -122,6 +122,7 @@ app/static/index.html  single-page UI
 tests/                 pytest flow, isolation and limit tests
 scripts/e2e_sandbox.py real-sandbox end-to-end run (saves docs/e2e/)
 scripts/record_demo.py demo video recorder (narration via scripts/demo_tts.py)
+scripts/postprocess_demo.py  login-cover card, still-screen zoom, final mux
 scripts/screenshot.py  mock-mode UI screenshot helper
 ```
 

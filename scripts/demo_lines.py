@@ -6,7 +6,7 @@ LINES = {
  "order": "The customer writes an order in plain language, with a shipping address.",
  "created": "Prices come from the shop catalog, never from the customer or the model. The agent calls the PayPal Agent Toolkit tool create order, and returns a checkout link.",
  "checkout": "The buyer follows the link to PayPal Checkout. This sandbox page appears in Korean, because of the test account's locale.",
- "login": "The buyer signs in with a PayPal sandbox account. The credentials are hidden in this recording.",
+ "login": "The buyer signs in to the sandbox.",
  "review": "The buyer reviews the payment and approves it.",
  "paid": "Back in the app, the payment is captured with the PayPal Orders API, and the order turns PAID.",
  "refund": "Later, the customer asks for a refund. The agent can only file a request.",

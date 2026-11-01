@@ -3,7 +3,8 @@ Needs SANDBOX_BUYER_EMAIL / SANDBOX_BUYER_PASSWORD in .env. Credentials are cove
 Steps: python scripts/demo_tts.py (see its docstring) -> python scripts/record_demo.py
 Note: if Playwright's bundled ffmpeg is too old for record_video (no webm output), point PLAYWRIGHT_BROWSERS_PATH at a folder whose
 ffmpeg-<rev>/ffmpeg-mac is a wrapper around a current ffmpeg and which symlinks the chromium dirs.
-Output: docs/demo/solo_seller_order_agent_demo.mp4 (work files in docs/demo/work, git-ignored)."""
+Output: docs/demo/solo_seller_order_agent_demo.mp4 (work files in docs/demo/work, git-ignored).
+Then run scripts/postprocess_demo.py: it swaps the long black login cover for a short card and adds a slow zoom on still screens."""
 import glob, json, os, re, subprocess, sys, time
 from pathlib import Path
 from playwright.sync_api import sync_playwright
