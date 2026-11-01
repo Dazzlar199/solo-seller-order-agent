@@ -2,8 +2,8 @@
 
 **Tagline:** An AI order agent for one-person shops. It drafts the order and the checkout, and a human approves every refund.
 
-**Repository:** (repo URL) (MIT)
-**Demo video:** (YouTube link) (file: `docs/demo/solo_seller_order_agent_demo.mp4`)
+**Repository:** https://github.com/Dazzlar199/solo-seller-order-agent (MIT)
+**Demo video:** https://youtu.be/m2vOSLmc5DY (file: `docs/demo/solo_seller_order_agent_demo.mp4`)
 
 ## Inspiration
 
@@ -74,7 +74,7 @@ Python 3.12, FastAPI, Uvicorn, Pydantic, Claude via an OpenAI-compatible LLM cli
 
 No account with us and no payment is needed; everything uses the PayPal Sandbox.
 
-1. Clone the repo: `git clone (repo URL) && cd solo-seller-order-agent`
+1. Clone the repo: `git clone https://github.com/Dazzlar199/solo-seller-order-agent && cd solo-seller-order-agent`
 2. Python 3.11+: `uv venv --python 3.12 && source .venv/bin/activate && uv pip install -r requirements.txt && uv pip install --no-deps paypal-agent-toolkit` (plain `pip` works the same way).
 3. `cp .env.example .env` and set `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` (a Sandbox app from https://developer.paypal.com/dashboard/applications/sandbox) and `MOCK_PAYPAL=0`. `LLM_API_KEY` (with `LLM_BASE_URL` and `LLM_MODEL`) is optional; without it the rule-based agent is used.
 4. `./run.sh`, then open http://localhost:8000. The header badge should read "PayPal: PayPal Sandbox".
