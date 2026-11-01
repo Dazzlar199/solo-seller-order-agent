@@ -1,5 +1,6 @@
 """End-to-end run against the real PayPal sandbox: chat order -> PayPal approval (sandbox buyer) -> capture -> refund request -> seller approval.
-Needs the app running (./run.sh) and SANDBOX_BUYER_EMAIL / SANDBOX_BUYER_PASSWORD in .env (fake sandbox money)."""
+Needs the app running (./run.sh) and SANDBOX_BUYER_EMAIL / SANDBOX_BUYER_PASSWORD in .env (fake sandbox money).
+If LLM_API_KEY is set the chat is answered by the LLM; the script prints how many replies came from each path."""
 import os, sys, time, glob
 from pathlib import Path
 from playwright.sync_api import sync_playwright
@@ -14,8 +15,13 @@ with sync_playwright() as p:
     ctx = br.new_context(locale="en-US", viewport={"width": 1440, "height": 900}, record_video_dir=str(OUT), record_video_size={"width": 1440, "height": 900})
     pg = ctx.new_page(); pg.goto(B); pg.wait_for_timeout(1500)
     box = pg.get_by_placeholder("Describe what you want to order...")
+    def send(m):
+        n = pg.locator(".msg.bot").count()
+        box.fill(m); box.press("Enter")
+        pg.wait_for_function("n => document.querySelectorAll('.msg.bot').length > n && !document.getElementById('sendbtn').disabled", arg=n, timeout=90000)
+        pg.wait_for_timeout(2500)
     for m in ["2 lavender soaps and a cedar candle", "ship to Jane Kim, 12 Oak St, Austin, TX 78701"]:
-        box.fill(m); box.press("Enter"); pg.wait_for_timeout(4000)
+        send(m)
     shot(pg, "1_order_created")
     link = pg.locator("a[href*='paypal.com']").last; href = link.get_attribute("href"); print("pay link", href[:60])
     pg.goto(href); pg.wait_for_load_state("domcontentloaded"); pg.wait_for_timeout(5000); shot(pg, "2_paypal_login")
@@ -32,7 +38,9 @@ with sync_playwright() as p:
     shot(pg, "3b_after_click")
     pg.wait_for_url(B + "/**", timeout=60000); pg.wait_for_timeout(4000); shot(pg, "4_back_paid")
     box = pg.get_by_placeholder("Describe what you want to order...")
-    box.fill("I want a refund, the candle arrived broken"); box.press("Enter"); pg.wait_for_timeout(4000); shot(pg, "5_refund_requested")
+    send("I want a full refund for the whole order, the candle arrived broken"); shot(pg, "5_refund_requested")
     pg.get_by_role("button", name="Approve refund").first.click(); pg.wait_for_timeout(6000); shot(pg, "6_refund_approved")
+    tags = pg.locator(".tag").all_inner_texts(); print("reply sources:", {t: tags.count(t) for t in set(tags)})
+    print("approval cards:", pg.locator("#approvals .card").all_inner_texts()[0][:200].replace("\n", " | "))
     ctx.close(); br.close()
 print("done")

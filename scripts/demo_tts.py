@@ -1,5 +1,4 @@
-"""Make English narration wavs for the demo. Run from the cyclopedia_upgrade repo (it owns the local Qwen3-TTS engine):
-  cd /Users/dazzlar/Desktop/coding/cyclopedia_upgrade && PYTHONPATH=. .venv/bin/python /Users/dazzlar/Desktop/coding/solo-seller-order-agent/scripts/demo_tts.py
+"""Make English narration wavs for the demo. Uses a local Qwen3-TTS engine (module wolcheon.engine.narration, from the author's separate tooling repo, put on PYTHONPATH).
 Falls back to macOS `say -v Samantha` if the local engine fails. Writes docs/demo/work/<key>.wav and durations.json."""
 import json, subprocess, sys, shutil
 from pathlib import Path

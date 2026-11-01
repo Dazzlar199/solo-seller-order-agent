@@ -29,6 +29,6 @@ class Store:
     def new_id(self, prefix: str) -> str:
         return f"{prefix}-{uuid.uuid4().hex[:6].upper()}"
 
-    def audit(self, actor: str, action: str, detail: str):
-        self.data["audit"].append({"t": int(time.time()), "actor": actor, "action": action, "detail": detail})
+    def audit(self, actor: str, action: str, detail: str, sid: str | None = None):
+        self.data["audit"].append({"t": int(time.time()), "actor": actor, "action": action, "detail": detail, "sid": sid})
         self.data["audit"] = self.data["audit"][-200:]

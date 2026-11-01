@@ -15,7 +15,12 @@ from . import config
 from .paypal_gateway import Gateway
 from .store import Store
 
+MAX_ORDERS_PER_SESSION = 10
 REQUIRED_SHIPPING = ["name", "line1", "city", "postal_code", "country"]
+
+
+def err(msg: str, **extra) -> dict:
+    return {"error": msg, **extra}
 
 
 def load_catalog() -> list[dict]:
@@ -46,7 +51,7 @@ class Shop:
             order["status"] = "PAID"
             order["capture_id"] = info["capture_id"]
             order["approve_url"] = None
-            self.store.audit("system", "payment_captured", order["id"])
+            self.store.audit("system", "payment_captured", order["id"], order["session_id"])
             self.store.save()
         return order
 
@@ -56,7 +61,10 @@ class Shop:
     # ---------- agent-facing ----------
     def create_order(self, session_id: str, items: list[dict], shipping: dict | None) -> dict:
         if not items:
-            return {"error": "No items given."}
+            return err("No items given.")
+        mine = sum(1 for o in self.store.data["orders"].values() if o["session_id"] == session_id)
+        if mine >= MAX_ORDERS_PER_SESSION:
+            return err(f"Order limit reached for this demo session ({MAX_ORDERS_PER_SESSION}). Press Reset demo to start over.")
         lines, bad = [], []
         for it in items:
             sku = str(it.get("sku", "")).upper()
@@ -66,13 +74,13 @@ class Shop:
                 bad.append(sku)
                 continue
             if not 1 <= qty <= 20:
-                return {"error": f"Quantity for {sku} must be between 1 and 20."}
-            lines.append({"sku": sku, "name": p["name"], "quantity": qty, "unit_price": p["price"]})
+                return err(f"Quantity for {sku} must be between 1 and 20.")
+            lines.append({"sku": sku, "name": p["name"], "name_en": p.get("name_en", p["name"]), "quantity": qty, "unit_price": p["price"]})
         if bad:
-            return {"error": f"Unknown SKU(s): {', '.join(bad)}. Use list_products."}
+            return err(f"Unknown SKU(s): {', '.join(bad)}. Use list_products.")
         missing = [f for f in REQUIRED_SHIPPING if not (shipping or {}).get(f)]
         if missing:
-            return {"error": "Shipping details incomplete.", "missing_fields": missing}
+            return err("Shipping details incomplete.", missing_fields=missing)
         oid = self.store.new_id("ORD")
         res = self.gw.create_order(
             lines, shipping,
@@ -87,7 +95,7 @@ class Shop:
             "created": int(time.time()), "gateway": self.gw.name,
         }
         self.store.data["orders"][oid] = order
-        self.store.audit("agent", "order_created", f"{oid} -> PayPal {res['id']} total {total}")
+        self.store.audit("agent", "order_created", f"{oid} -> PayPal {res['id']} total {total}", session_id)
         self.store.save()
         return {"order_id": oid, "total": total, "currency": config.CURRENCY,
                 "payment_link": res["approve_url"], "status": order["status"]}
@@ -95,7 +103,7 @@ class Shop:
     def get_order_status(self, order_id: str) -> dict:
         o = self.get_order(order_id)
         if not o:
-            return {"error": f"Order {order_id} not found."}
+            return err(f"Order {order_id} not found.")
         o = self.refresh(o)
         pending = [a["id"] for a in self.store.data["approvals"].values()
                    if a["order_id"] == o["id"] and a["status"] == "PENDING"]
@@ -105,20 +113,20 @@ class Shop:
     def _request(self, kind: str, order_id: str, reason: str, amount: float | None, requester: str) -> dict:
         o = self.get_order(order_id)
         if not o:
-            return {"error": f"Order {order_id} not found."}
+            return err(f"Order {order_id} not found.")
         o = self.refresh(o)
         if any(a["order_id"] == o["id"] and a["status"] == "PENDING" for a in self.store.data["approvals"].values()):
-            return {"error": "A request for this order is already waiting for the seller."}
+            return err("A request for this order is already waiting for the seller.")
         if kind == "REFUND":
             if o["status"] not in ("PAID", "PARTIALLY_REFUNDED"):
-                return {"error": f"Order is {o['status']}; only paid orders can be refunded."}
+                return err(f"Order is {o['status']}; only paid orders can be refunded.")
             remaining = round(o["total"] - o["refunded"], 2)
             amount = remaining if amount is None else round(float(amount), 2)
             if amount <= 0 or amount > remaining:
-                return {"error": f"Refund amount must be between 0.01 and {remaining:.2f}."}
+                return err(f"Refund amount must be between 0.01 and {remaining:.2f}.")
         else:
             if o["status"] != "AWAITING_PAYMENT":
-                return {"error": f"Order is {o['status']}; only unpaid orders can be cancelled. Request a refund instead."}
+                return err(f"Order is {o['status']}; only unpaid orders can be cancelled. Request a refund instead.")
             amount = o["total"]
         aid = self.store.new_id("REQ")
         self.store.data["approvals"][aid] = {
@@ -126,7 +134,7 @@ class Shop:
             "reason": reason or "(none given)", "status": "PENDING", "requested_by": requester,
             "created": int(time.time()), "result": None,
         }
-        self.store.audit("agent", f"{kind.lower()}_requested", f"{aid} for {o['id']} amount {amount}")
+        self.store.audit("agent", f"{kind.lower()}_requested", f"{aid} for {o['id']} amount {amount}", o["session_id"])
         self.store.save()
         return {"request_id": aid, "status": "PENDING_SELLER_APPROVAL",
                 "message": "Queued. Nothing is refunded or cancelled until the seller approves."}
@@ -136,6 +144,30 @@ class Shop:
 
     def request_cancel(self, order_id: str, reason: str) -> dict:
         return self._request("CANCEL", order_id, reason, None, "customer chat")
+
+    # ---------- per-visitor isolation ----------
+    def approval_owner(self, approval_id: str) -> str | None:
+        a = self.store.data["approvals"].get(approval_id)
+        o = a and self.store.data["orders"].get(a["order_id"])
+        return o["session_id"] if o else None
+
+    def reset_session(self, session_id: str) -> dict:
+        """Demo reset: drop this visitor's orders, requests, audit lines and chat history only."""
+        d = self.store.data
+        oids = {k for k, o in d["orders"].items() if o["session_id"] == session_id}
+        pp = {d["orders"][k]["paypal_order_id"] for k in oids}
+        for k in oids:
+            del d["orders"][k]
+        for k in [k for k, a in d["approvals"].items() if a["order_id"] in oids]:
+            del d["approvals"][k]
+        d["audit"] = [e for e in d["audit"] if e.get("sid") != session_id]
+        d["sessions"].pop(session_id, None)
+        mock = d.get("mock_paypal")
+        if mock:
+            for i in pp:
+                mock["orders"].pop(i, None)
+        self.store.save()
+        return {"orders_removed": len(oids)}
 
     # ---------- human-only ----------
     def approve(self, approval_id: str) -> dict:
@@ -162,11 +194,11 @@ class Shop:
                 a["result"] = "Order cancelled; payment link withdrawn"
         except Exception as e:
             a["result"] = f"FAILED: {e}"
-            self.store.audit("seller", "approval_failed", f"{approval_id}: {e}")
+            self.store.audit("seller", "approval_failed", f"{approval_id}: {e}", o["session_id"])
             self.store.save()
             raise
         a["status"] = "APPROVED"
-        self.store.audit("seller", "approved", f"{approval_id} {a['kind']} {o['id']} {a['amount']}")
+        self.store.audit("seller", "approved", f"{approval_id} {a['kind']} {o['id']} {a['amount']}", o["session_id"])
         self.store.save()
         return a
 
@@ -178,7 +210,7 @@ class Shop:
             raise ValueError(f"request already {a['status']}")
         a["status"] = "REJECTED"
         a["result"] = "Seller declined; no money moved"
-        self.store.audit("seller", "rejected", approval_id)
+        self.store.audit("seller", "rejected", approval_id, self.store.data["orders"][a["order_id"]]["session_id"])
         self.store.save()
         return a
 

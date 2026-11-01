@@ -1,6 +1,6 @@
 """Record the demo video against the real PayPal sandbox (app must be running: ./run.sh, MOCK_PAYPAL=0).
-Needs SANDBOX_BUYER_EMAIL / SANDBOX_BUYER_PASSWORD in .env. Credentials are covered by a black card in the video.
-Steps: python scripts/demo_tts.py (from the cyclopedia_upgrade repo, see its docstring) -> python scripts/record_demo.py
+Needs SANDBOX_BUYER_EMAIL / SANDBOX_BUYER_PASSWORD in .env. Credentials are covered by a black card in the video. The chat is answered by the LLM when LLM_API_KEY is set.
+Steps: python scripts/demo_tts.py (see its docstring) -> python scripts/record_demo.py
 Note: if Playwright's bundled ffmpeg is too old for record_video (no webm output), point PLAYWRIGHT_BROWSERS_PATH at a folder whose
 ffmpeg-<rev>/ffmpeg-mac is a wrapper around a current ffmpeg and which symlinks the chromium dirs.
 Output: docs/demo/solo_seller_order_agent_demo.mp4 (work files in docs/demo/work, git-ignored)."""
@@ -55,8 +55,8 @@ CARD_ARCH = card("""<div style="font-size:56px;font-weight:700;color:#1d4d4f;mar
 <div style="height:34px"></div>
 <div class=row><div class="box human"><b>Seller approval queue</b><small>agent requests refunds here<br>human click only</small></div><div class=arrow>&rarr;</div>
 <div class="box pp"><b>PayPal REST v2</b><small>capture after buyer approval<br>refund after seller approval</small></div></div>
-<div style="margin-top:50px;font-size:40px;color:#1d4d4f;font-weight:600">github.com/Dazzlar199/solo-seller-order-agent</div>
-<div style="margin-top:10px;font-size:28px;color:#5a5340">MIT licensed. Runs on the PayPal Sandbox.</div>""")
+<div style="margin-top:50px;font-size:40px;color:#1d4d4f;font-weight:600">Open source, MIT licensed</div>
+<div style="margin-top:10px;font-size:28px;color:#5a5340">Runs on the PayPal Sandbox. Claude via function calling.</div>""")
 
 marks = []; sub_queue = []; cur_end = 0.0
 def now(): return time.time() - T0
@@ -97,8 +97,12 @@ def zoom(pg, sel, s=1.6, dur=0.9):
       const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
       let tx = W / 2 - s * cx, ty = (H - 150) / 2 - s * cy; tx = Math.min(0, Math.max(W - s * W, tx)); ty = Math.min(0, Math.max(H - s * H, ty));
       z.style.transform = `translate(${tx}px,${ty}px) scale(${s})`; }""", [sel, s, dur])
-def type_chat(pg, text):
+def type_chat(pg, text, wait_reply=True):
+    n = pg.locator(".msg.bot").count()
     box = pg.get_by_placeholder("Describe what you want to order..."); box.click(); pg.keyboard.type(text, delay=55); sleep(pg, 0.6); box.press("Enter")
+    if wait_reply:  # the LLM answers in a few seconds; wait for the reply and the re-enabled Send button
+        wait_for(pg, lambda: pg.locator(".msg.bot").count() > n and not pg.locator("#sendbtn").is_disabled(), 90)
+        sleep(pg, 1.2)
 
 with sync_playwright() as p:
     br = p.chromium.launch(executable_path=exe, headless=True)
@@ -109,10 +113,10 @@ with sync_playwright() as p:
     pg.set_content(CARD_PROBLEM); say(pg, "problem"); sleep_until_narr_done(pg)
     pg.set_content(CARD_PROMISE); say(pg, "promise"); sleep_until_narr_done(pg)
     # 2) app + order
-    pg.goto(B); sleep(pg, 1.0); say(pg, "app"); sleep(pg, 3.5); zoom(pg, ".badges", 2.4); sleep(pg, 6.0); zoom(pg, None); sleep_until_narr_done(pg)
+    pg.goto(B); sleep(pg, 1.0); say(pg, "app"); sleep(pg, 2.5); zoom(pg, ".badges", 2.4); sleep(pg, 4.5); zoom(pg, None); sleep_until_narr_done(pg)
     say(pg, "order"); sleep(pg, 0.4)
-    type_chat(pg, "2 lavender soaps and a cedar candle"); sleep(pg, 3.0)
-    type_chat(pg, "ship to Jane Kim, 12 Oak St, Austin, TX 78701"); sleep(pg, 3.0)
+    type_chat(pg, "2 lavender soaps and a cedar candle"); sleep(pg, 1.5)
+    type_chat(pg, "ship to Jane Kim, 12 Oak St, Austin, TX 78701"); sleep(pg, 1.5)
     say(pg, "created"); sleep(pg, 2.0); zoom(pg, "#orders .card", 1.5); sleep_until_narr_done(pg); zoom(pg, None); sleep(pg, 0.9)
     href = pg.locator("a[href*='paypal.com']").last.get_attribute("href")
     # 3) PayPal
@@ -131,18 +135,18 @@ with sync_playwright() as p:
     print("review url", pg.url[:90]); sleep_until_narr_done(pg)
     pg.evaluate("() => { sessionStorage.removeItem('__mask'); window.__render(); }")
     pg.screenshot(path=str(W / "dbg_review.png"))
-    say(pg, "review"); sleep(pg, 2.0)
+    say(pg, "review"); sleep(pg, 1.0)
     for _ in range(5):
         if pg.url.startswith(B): break
         b = pg.get_by_role("button", name=re.compile("Continue|Complete|Pay Now|Agree|계속|결제|구매|동의")).first
         if b.count() and b.is_visible():
             print("clicking", b.inner_text()[:30]); b.click()
-        sleep(pg, 4.5)
+        wait_for(pg, lambda: pg.url.startswith(B), 4.0)
     pg.wait_for_url(B + "/**", timeout=60000); sleep(pg, 2.5)
     say(pg, "paid"); sleep(pg, 0.5); zoom(pg, "#orders .card", 1.5); sleep_until_narr_done(pg); sleep(pg, 0.8); zoom(pg, None); sleep(pg, 0.9)
     # 4) refund
     say(pg, "refund"); sleep(pg, 0.3)
-    type_chat(pg, "I want a refund, the candle arrived broken"); sleep(pg, 4.0)
+    type_chat(pg, "I want a full refund for the whole order, the candle arrived broken"); sleep(pg, 1.0)
     say(pg, "queue"); zoom(pg, "#approvals .card", 1.5); sleep_until_narr_done(pg); sleep(pg, 0.5); zoom(pg, None); sleep(pg, 0.9)
     say(pg, "approve"); sleep(pg, 2.0)
     pg.get_by_role("button", name="Approve refund").first.click(); sleep(pg, 2.0)

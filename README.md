@@ -19,11 +19,13 @@ A solo seller (soap maker, candle shop, print-on-demand artist) takes orders ove
 
 ## Real sandbox run
 
-Everything below ran against the real PayPal Sandbox (not mock mode) with a sandbox buyer account: chat order, PayPal Checkout approval, capture, refund request, seller approval, refund COMPLETED. The agent in this run was the rule-based fallback (no LLM key set).
+Everything below ran against the real PayPal Sandbox (not mock mode) with a sandbox buyer account: chat order, PayPal Checkout approval, capture, refund request, seller approval, refund COMPLETED. The agent in this run was a real LLM (Claude `claude-sonnet-5-5` through function calling; every chat reply carries an "AI model response" tag in the UI). The demo video was re-recorded with the same setup.
 
 ![Refund approved by the seller, order REFUNDED](docs/e2e/6_refund_approved.png)
 
-More screenshots: [order created](docs/e2e/1_order_created.png), [paid](docs/e2e/4_back_paid.png), [refund requested](docs/e2e/5_refund_requested.png). Demo video (under 3 minutes): `docs/demo/solo_seller_order_agent_demo.mp4`, recorded by `scripts/record_demo.py`. Devpost text: [docs/devpost_submission.md](docs/devpost_submission.md).
+The run is reproducible with `scripts/e2e_sandbox.py` (needs the app running and a sandbox buyer account in `.env`).
+
+More screenshots: [order created](docs/e2e/1_order_created.png), [paid](docs/e2e/4_back_paid.png), [refund requested](docs/e2e/5_refund_requested.png). Demo video (under 3 minutes, real sandbox and real LLM, sandbox credentials covered): `docs/demo/solo_seller_order_agent_demo.mp4`, recorded by `scripts/record_demo.py`. Devpost text: [docs/devpost_submission.md](docs/devpost_submission.md).
 
 ## Architecture
 
@@ -40,7 +42,7 @@ flowchart LR
   S -->|capture| P
 ```
 
-The agent receives an `AgentTools` object that has **no** approve, refund-execution or gateway method. The refund call exists only behind `POST /api/approvals/{id}/approve`, a human-clicked endpoint. A test (`test_agent_has_no_money_moving_surface`) pins this.
+The agent receives an `AgentTools` object that has **no** approve, refund-execution or gateway method. The refund call exists only behind `POST /api/approvals/{id}/approve`, a human-clicked endpoint. A test (`test_agent_has_no_money_moving_surface`) pins this. Customer text never sets a price: totals are computed from `app/catalog.json`.
 
 ## Where PayPal is used
 
@@ -58,6 +60,14 @@ The Agent Toolkit has no refund or capture tool, so those two calls use REST v2 
 - The agent can *request* a refund or cancellation (amount, reason, order) and tells the customer that a person must approve.
 - The seller sees each request with reason and amount and clicks Approve or Decline.
 - Guardrails in code: only paid orders can be refunded, amount is capped at the remaining captured amount, one open request per order, an approved request cannot run twice, and every action is written to an audit log shown in the UI.
+
+## Public-demo hardening
+
+Built so the app can be hosted for judges without one visitor affecting another or running up the LLM bill:
+
+- **Per-visitor session isolation**: orders, approval requests, audit lines and chat history are scoped to a random browser session id. Another visitor cannot see, approve or reject your requests (404). **Reset demo** deletes only your own data.
+- **Abuse limits** (`app/limits.py`, in memory, no extra dependency): messages are capped at 500 characters; each IP gets 30 messages per hour, after which replies switch to the rule-based path with a notice, and at twice that the chat is refused (429); a global cap of 500 LLM calls per UTC day, after which everyone gets rule-based answers; at most 10 orders per session. The first three limits are configurable in `.env` (see `.env.example`).
+- **Path-prefix safe**: the UI and PayPal return redirects use relative URLs, so it also runs behind a reverse proxy at a sub-path (`uvicorn --root-path /demo`).
 
 ## Run it
 
@@ -97,19 +107,22 @@ LLM_MODEL=claude-sonnet-5-5
 4. In the chat, send `I want a refund for ORD-XXXXXX, the candle arrived broken` (use your order id).
 5. In the right column the request is PENDING and the order is still PAID. Click **Approve refund**; the card turns REFUNDED. Verify the refund in the sandbox business account's activity.
 
-Tests (no network, mock gateway): `pytest -q`.
+Tests (21, no network, mock gateway, LLM path stubbed): `pytest -q`.
 
 ## Project layout
 
 ```
 app/main.py            FastAPI routes, buyer redirects, seller approval endpoints
 app/agent.py           LLM tool loop + rule-based fallback
+app/limits.py          per-IP and daily LLM abuse limits
 app/shop.py            order logic, AgentTools (agent surface), approve/reject (human surface)
 app/paypal_gateway.py  LiveGateway (Agent Toolkit + REST v2) and MockGateway
 app/catalog.json       sample catalog (USD)
 app/static/index.html  single-page UI
-tests/                 pytest flow tests
-scripts/screenshot.py  drives the UI and saves docs/screenshot.png
+tests/                 pytest flow, isolation and limit tests
+scripts/e2e_sandbox.py real-sandbox end-to-end run (saves docs/e2e/)
+scripts/record_demo.py demo video recorder (narration via scripts/demo_tts.py)
+scripts/screenshot.py  mock-mode UI screenshot helper
 ```
 
 ## License

@@ -7,3 +7,4 @@ data/state.json
 .DS_Store
 docs/e2e/*.webm
 docs/demo/work/
+docs/demo/ko-work/

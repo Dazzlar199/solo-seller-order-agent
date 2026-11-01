@@ -21,6 +21,7 @@ main{display:grid;grid-template-columns:minmax(320px,1fr) minmax(320px,1fr) minm
 .col h2 b{color:var(--ink);font-weight:600;text-transform:none;letter-spacing:0}
 .scroll{overflow:auto;padding:14px 16px;flex:1}
 .msg{max-width:88%;padding:9px 12px;border-radius:12px;margin:0 0 10px;white-space:pre-wrap;word-break:break-word}
+.tag{font-size:10.5px;color:var(--mute);margin:-6px 0 10px 4px}
 .msg.me{background:var(--accent);color:#fff;margin-left:auto;border-bottom-right-radius:3px}
 .msg.bot{background:#f1efe9;border-bottom-left-radius:3px}
 .msg a{color:var(--accent-2);font-weight:600}
@@ -58,7 +59,7 @@ td{padding:3px 0}td.r{text-align:right;font-variant-numeric:tabular-nums}
 <body>
 <header>
   <div><h1>Solo Seller Order Agent</h1><div class="sub">AI drafts. A human approves money movement.</div></div>
-  <div class="badges"><span class="badge" id="b-paypal">PayPal: ...</span><span class="badge" id="b-agent">Agent: ...</span></div>
+  <div class="badges"><button class="badge" id="reset" type="button" style="cursor:pointer;color:#fff">Reset demo</button><span class="badge" id="b-paypal">PayPal: ...</span><span class="badge" id="b-agent">Agent: ...</span></div>
 </header>
 <main>
   <section class="col" aria-label="Customer chat">
@@ -79,16 +80,20 @@ td{padding:3px 0}td.r{text-align:right;font-variant-numeric:tabular-nums}
   </section>
 </main>
 <script>
-const sid = (() => { try { let s = localStorage.getItem('sid'); if (!s) { s = 's' + Math.random().toString(36).slice(2, 10); localStorage.setItem('sid', s); } return s; } catch (e) { return 's' + Date.now(); } })();
+const sid = (() => { try { let s = localStorage.getItem('sid'); if (!s) { s = 's' + (crypto.randomUUID ? crypto.randomUUID().replace(/-/g, '') : Math.random().toString(36).slice(2) + Date.now().toString(36)); localStorage.setItem('sid', s); } return s; } catch (e) { return 's' + Date.now() + Math.random().toString(36).slice(2); } })();
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const linkify = s => esc(s).replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+const linkify = s => esc(s).replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>').replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
 const money = n => '$' + Number(n).toFixed(2);
 const label = s => s.replace(/_/g, ' ');
-function say(text, who) { const d = document.createElement('div'); d.className = 'msg ' + who; d.innerHTML = linkify(text); $('chat').appendChild(d); $('chat').scrollTop = 1e9; }
+function say(text, who, mode) {
+  const d = document.createElement('div'); d.className = 'msg ' + who; d.innerHTML = linkify(text); $('chat').appendChild(d);
+  if (who === 'bot' && mode) { const t = document.createElement('div'); t.className = 'tag'; t.textContent = mode === 'llm' ? 'AI model response' : 'Rule-based response'; $('chat').appendChild(t); }
+  $('chat').scrollTop = 1e9;
+}
 
 async function cfg() {
-  const c = await (await fetch('/api/config')).json();
+  const c = await (await fetch('api/config')).json();
   const p = $('b-paypal'); p.textContent = 'PayPal: ' + c.paypal; if (c.mock) p.classList.add('mock');
   $('b-agent').textContent = 'Agent: ' + c.agent;
 }
@@ -96,8 +101,8 @@ async function send(text) {
   if (!text.trim()) return;
   say(text, 'me'); $('input').value = ''; $('sendbtn').disabled = true;
   try {
-    const r = await fetch('/api/chat', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({session_id: sid, message: text})});
-    const j = await r.json(); say(j.reply || j.detail || 'Error', 'bot');
+    const r = await fetch('api/chat', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({session_id: sid, message: text})});
+    const j = await r.json(); say(j.reply || j.detail || 'Error', 'bot', j.mode);
   } catch (e) { say('Network error, please retry.', 'bot'); }
   $('sendbtn').disabled = false; refresh();
 }
@@ -122,7 +127,7 @@ function approvalCard(a) {
   <div class="meta">Reason: ${esc(a.reason)}</div>${a.result ? `<div class="meta">${esc(a.result)}</div>` : ''}${btns}</div>`;
 }
 async function refresh() {
-  const s = await (await fetch('/api/state?session_id=' + sid)).json();
+  const s = await (await fetch('api/state?session_id=' + encodeURIComponent(sid))).json();
   $('orders').innerHTML = s.orders.length ? s.orders.map(orderCard).join('') : '<div class="empty">No orders yet. Place one in the chat.</div>';
   $('ocount').textContent = s.orders.length + (s.orders.length === 1 ? ' order' : ' orders');
   const pend = s.approvals.filter(a => a.status === 'PENDING').length;
@@ -133,14 +138,21 @@ async function refresh() {
 $('approvals').onclick = async e => {
   const b = e.target.closest('button[data-a]'); if (!b) return;
   b.disabled = true;
-  const r = await fetch(`/api/approvals/${b.dataset.id}/${b.dataset.a}`, {method: 'POST'});
+  const r = await fetch(`api/approvals/${b.dataset.id}/${b.dataset.a}?session_id=${encodeURIComponent(sid)}`, {method: 'POST'});
   if (!r.ok) alert((await r.json()).detail);
   refresh();
 };
+$('reset').onclick = async () => {
+  if (!confirm('Delete your orders, approval requests and chat history and start over? (Other visitors are not affected.)')) return;
+  await fetch('api/reset?session_id=' + encodeURIComponent(sid), {method: 'POST'});
+  $('chat').innerHTML = ''; greet(); refresh();
+};
 const q = new URLSearchParams(location.search);
 cfg(); refresh(); setInterval(refresh, 2500);
-say('Hi! Tell me what you would like to order. I can also check an order or request a refund for you.', 'bot');
+function greet() { say('Hi! Tell me what you would like to order. I can also check an order or request a refund for you.', 'bot'); }
+greet();
 if (q.get('paid')) say('Welcome back from PayPal. Checking payment for ' + q.get('paid') + '...', 'bot');
+if (q.get('cancelled')) say('Payment cancelled. Order ' + q.get('cancelled') + ' is still awaiting payment.', 'bot');
 </script>
 </body>
 </html>
