@@ -1,6 +1,8 @@
 # Solo Seller Order Agent
 
 > **AI drafts, human approves money movement.**
+>
+> Demo video (under 3 min): https://youtu.be/m2vOSLmc5DY
 > A chat-to-checkout order agent for one-person shops, built on the PayPal Agent Toolkit and the PayPal Sandbox.
 
 ![UI](docs/screenshot.png)
